@@ -7,6 +7,8 @@ require 'pry'
 require 'terminal-table'
 require 'uri'
 
+$checkmark = "\u2713".encode('utf-8')
+$x = "\u2717".encode('utf-8')
 
 def execute_get(url, token = nil)
   uri = URI.parse(url)
@@ -37,12 +39,12 @@ def validate_hostname(hostname, prompt)
     break unless response.nil?
 
     puts
-    puts "The hostname \"#{hostname}\" was not found.".red
+    puts "#{$x} The hostname \"#{hostname}\" was not found".red
     hostname = request_input(prompt)
   end
 
   puts
-  puts  'Hostname has been found'.green
+  puts  "#{$checkmark} Hostname has been found".green
 
   base_url
 end
@@ -64,12 +66,12 @@ def validate_token_key(base_url, token_key, prompt)
     break if response.code == '200'
 
     puts
-    puts "The token key \"#{token_key}\" is not valid.".red
+    puts "#{$x} The token key \"#{token_key}\" is not valid".red
     token_key = request_input(prompt)
   end
 
   puts
-  puts  'Token has been validated'.green
+  puts  "#{$checkmark} Token has been validated".green
 
   token
 end
@@ -89,12 +91,12 @@ def validate_organization(base_url, token, organization_name, prompt)
     break if organization_response.code == '200'
 
     puts
-    puts "The organization \"#{organization_name}\" was not found."
+    puts "#{$x} The organization \"#{organization_name}\" was not found".red
     organization_name = request_input(prompt)
   end
 
   puts
-  puts  'Organization has been found'.green
+  puts  "#{$checkmark} Organization has been found".green
 
   organization_response.body
 end
@@ -116,12 +118,12 @@ def validate_team(base_url, token, organization_name, team, prompt)
     break if team_response.code == '200'
 
     puts
-    puts "The team \"#{team}\" was not found in the \"#{organization_name}\" organization.".red
+    puts "#{$x} The team \"#{team}\" was not found in the \"#{organization_name}\" organization.".red
     team = request_input(prompt)
   end
 
   puts
-  puts 'Team has been found'.green
+  puts "#{$checkmark} Team has been found".green
 
   team_response.body
 end
@@ -142,7 +144,7 @@ def get_team(base_url, token, organization, team_name)
   full_url = base_url + "/orgs/#{organization}/teams/#{team_name}"
   response = execute_get(full_url, token)
   if response.code != '200' || response.body == '[]'
-    raise StandardError, "Team not found: #{response.body}".red
+    raise StandardError, "#{$x} Team not found: #{response.body}".red
     exit
   end
 
@@ -154,7 +156,7 @@ def get_name(base_url, token, username)
 
   response = execute_get(full_url, token)
   if response.code != '200' || response.body == '[]'
-    raise StandardError, "User with username #{username} not found: #{response.body}".red
+    raise StandardError, "#{$x} User with username #{username} not found: #{response.body}".red
     exit
   end
 
@@ -167,7 +169,7 @@ def get_team_members(base_url, token, team_id)
 
   response = execute_get(full_url, token)
   if response.code != '200' || response.body == '[]'
-    raise StandardError, "No team members not found: #{response.body}".red
+    raise StandardError, "#{$x} No team members not found: #{response.body}".red
     exit
   end
 
@@ -194,7 +196,7 @@ def get_team_repos(base_url, token, team_id)
 
     response = execute_get(full_url, token)
     if response.code != '200'
-      raise StandardError, "No repos not found: #{response.body}".red
+      raise StandardError, "#{$x} No repos not found: #{response.body}".red
       exit
     end
 
@@ -260,6 +262,7 @@ def extra_team_members_test(team_members, users_in_codeowners_file)
     extra_team_members.delete(username) if users_in_codeowners_file.include?(username)
   end
 
+  binding.pry
   extra_team_members
 end
 
@@ -323,7 +326,7 @@ def remove_items(array, name_of_items, print_all_function, print_one_function = 
             removed = true
           else
             puts
-            puts "#{to_remove_index} is not a valid number. Valid numbers are between 1 and #{array.length}".red
+            puts "#{$x} #{to_remove_index} is not a valid number. Valid numbers are between 1 and #{array.length}".red
           end
         end
 
@@ -338,7 +341,7 @@ def remove_items(array, name_of_items, print_all_function, print_one_function = 
               else
                 print_one_function.call(array[index])
               end
-            remove_message = "Removing the #{name_of_items} at position #{index+1}: \"#{printed_item}\"".green
+            remove_message = "#{$checkmark} Removing the #{name_of_items} at position #{index+1}: \"#{printed_item}\"".green
             puts
             puts remove_message
           array.delete_at(index)
@@ -353,7 +356,7 @@ def remove_items(array, name_of_items, print_all_function, print_one_function = 
       break if array.length == 0
     else
       puts
-      puts 'Invalid input. Enter yes, y, no, or n.'
+      puts "#{$x} Invalid input. Enter yes, y, no, or n.".red
     end
     puts
     puts "Would you like to remove some more #{name_of_items}s? y/n"
@@ -468,7 +471,7 @@ def sort_repos(base_url, token, team_members, repo_names, status_arrays)
 end
 
 def print_correct_team_members_repo(array)
-  puts "- #{singular_or_plural(array.length)} no missing or extra team members".green
+  puts "#{$checkmark} #{singular_or_plural(array.length)} no missing or extra team members".green
   return if array.length == 0
 
   table = Terminal::Table.new :headings => ['Repo Name'],
@@ -477,7 +480,7 @@ def print_correct_team_members_repo(array)
 end
 
 def print_extra_and_missing_team_members_repo(array)
-  puts "- #{singular_or_plural(array.length)} extra team members".yellow
+  puts "#{$x} #{singular_or_plural(array.length)} extra team members".yellow
   return if array.length == 0
 
   table = Terminal::Table.new :headings => ['Repo Name', 'Missing Team Members', 'Extra Team Members']
@@ -492,7 +495,7 @@ def print_extra_and_missing_team_members_repo(array)
 end
 
 def print_missing_team_members_repo(array)
-  puts "- #{singular_or_plural(array.length)} missing team members".yellow
+  puts "#{$x} #{singular_or_plural(array.length)} missing team members".yellow
   return if array.length == 0
 
   table = Terminal::Table.new :headings => ['Repo Name', 'Missing Team Members']
@@ -506,7 +509,7 @@ def print_missing_team_members_repo(array)
 end
 
 def print_extra_team_members_repo(array)
-  puts "- #{singular_or_plural(array.length)} extra team members".yellow
+  puts "#{$x} #{singular_or_plural(array.length)} extra team members".yellow
   return if array.length == 0
 
   table = Terminal::Table.new :headings => ['Repo Name', 'Extra Team Members']
@@ -615,15 +618,15 @@ base_url = initialize_base_url(ARGV[0],
     'Please enter your GitHub Enterprise hostname. It follows this pattern: "github.[foobar].com"')
 token = initialize_token(base_url, ARGV[1], 'Please enter your token key. Do not including the word token.')
 
-organization = initialize_organization(base_url, token, ARGV[2], 'Please enter your organization.')
+organization = initialize_organization(base_url, token, ARGV[2], 'Please enter your organization name.')
 organization_name = organization['name']
-puts "- Name: #{organization_name}"
-puts "- Id: #{organization['id']}"
+puts "  - Name: #{organization_name}"
+puts "  - Id: #{organization['id']}"
 
 team = initialize_team(base_url, token, organization_name, ARGV[3], 'Please enter your team name.')
 team_id = team['id']
-puts "- Name: #{team['name']}"
-puts "- Id: #{team_id}"
+puts "  - Name: #{team['name']}"
+puts "  - Id: #{team_id}"
 
 # Find team members
 team_members = get_team_members(base_url, token, team_id)
