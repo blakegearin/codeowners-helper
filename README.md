@@ -83,7 +83,7 @@ Codeowners Helper is a command-line interface for CODEOWNERS maintenance for tea
 
 * Option to remove team members
 * Option to remove repos
-* Results displayed in tables
+* Detailed results displayed in tables
 * Color- & symbol-coded messages for easy reading
 
 ## Notes

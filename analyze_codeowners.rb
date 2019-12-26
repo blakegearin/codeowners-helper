@@ -233,10 +233,13 @@ end
 def get_codeowners(full_url, token)
   response = execute_get(full_url, token)
 
-  # Narrows response to the line with users
-  codeowners_line = response.body[/\n\*(\s|@|\w)*/]
+  # Replace unrecognized characters with spaces
+  encoded_response_body = response.body.encode('UTF-8', :invalid => :replace, :undef => :replace, :replace => ' ')
 
-   # Removes excess symbols
+  # Narrow response to the line with users
+  codeowners_line = encoded_response_body[/\n\*(\s|@|\w)*/]
+
+   # Remove excess characters
   team_members_found_string = codeowners_line.gsub(/(\n|\*|\@)/,'')
 
   team_members_found_array = team_members_found_string.split(' ')
@@ -262,7 +265,7 @@ def extra_team_members_test(team_members, users_in_codeowners_file)
     extra_team_members.delete(username) if users_in_codeowners_file.include?(username)
   end
 
-  binding.pry
+  # binding.pry
   extra_team_members
 end
 
@@ -274,7 +277,7 @@ def calculate_extra_spaces(current_digit, array)
   " " * extra_spaces_count
 end
 
-def print_list(array)
+def print_repo_name_table(array)
   table = Terminal::Table.new :headings => ['Repo Name'],
       :rows => array.map { |item| [item] }
   puts table
@@ -291,10 +294,10 @@ def print_team_members(team_members_array)
   end
 end
 
-def print_repo_names(repo_names_array)
-  for i in 0..repo_names_array.length-1 do
-    extra_spaces = calculate_extra_spaces(i+1, repo_names_array)
-    puts "  #{i+1}.#{extra_spaces} #{repo_names_array[i]}"
+def print_list(array)
+  for i in 0..array.length-1 do
+    extra_spaces = calculate_extra_spaces(i+1, array)
+    puts "  #{i+1}.#{extra_spaces} #{array[i]}"
   end
 end
 
@@ -365,6 +368,40 @@ def remove_items(array, name_of_items, print_all_function, print_one_function = 
   array
 end
 
+def initialize_status_arrays
+  correct_path_team_members_correct = []
+  correct_path_team_members_extra_and_missing = []
+  correct_path_team_members_missing = []
+  correct_path_team_members_extra = []
+  correct_path_codeowners = [
+    correct_path_team_members_correct,
+    correct_path_team_members_extra_and_missing,
+    correct_path_team_members_missing,
+    correct_path_team_members_extra
+  ]
+
+  incorrect_path_team_members_correct = []
+  incorrect_path_team_members_extra_and_missing = []
+  incorrect_path_team_members_missing = []
+  incorrect_path_team_members_extra = []
+  incorrect_path_codeowners = [
+    incorrect_path_team_members_correct,
+    incorrect_path_team_members_extra_and_missing,
+    incorrect_path_team_members_missing,
+    incorrect_path_team_members_extra
+  ]
+
+  duplicate_codeowners = []
+  missing_codeowners = []
+
+  [
+    correct_path_codeowners,
+    incorrect_path_codeowners,
+    duplicate_codeowners,
+    missing_codeowners
+  ]
+end
+
 def singular_or_plural(number)
   if number == 1
     '1 repo has'
@@ -391,12 +428,14 @@ def sort_repos(base_url, token, team_members, repo_names, status_arrays)
   missing_codeowners = status_arrays[3]
 
   repo_names.each do |repo_name|
+    correct_path_response = ''
+    incorrect_path_response = ''
+
     correct_path_response = check_correct_path(base_url, token, repo_name)
     correct_path = correct_path_response.code == '200'
 
     incorrect_path_response = check_incorrect_path(base_url, token, repo_name)
     incorrect_path = incorrect_path_response.code == '200'
-
 
     if correct_path && incorrect_path
       duplicate_codeowners.push(repo_name)
@@ -438,6 +477,7 @@ def sort_repos(base_url, token, team_members, repo_names, status_arrays)
 
       missing_team_members = missing_team_members_test(team_members, users_in_codeowners_file)
       extra_team_members = extra_team_members_test(team_members, users_in_codeowners_file)
+      # binding.pry if repo_name == 'healtheintent/analytics-content-authoring'
 
       if missing_team_members.empty? && extra_team_members.empty?
         incorrect_path_team_members_extra_and_missing.push(
@@ -522,7 +562,25 @@ def print_extra_team_members_repo(array)
   puts table
 end
 
-def print_repo_statuses(status_arrays)
+def print_initial_findings(status_arrays)
+  correct_path_codeowners = status_arrays[0]
+  incorrect_path_codeowners = status_arrays[1]
+  duplicate_codeowners = status_arrays[2]
+  missing_codeowners = status_arrays[3]
+
+  status_arrays_size = status_arrays.flatten(1).count
+
+  correct_path_codeowners_size = correct_path_codeowners.flatten(1).count
+  incorrect_path_codeowners_size = incorrect_path_codeowners.flatten(1).count
+
+  puts "#{$checkmark} #{status_arrays_size} repos analyzed".green
+  puts "  1. #{singular_or_plural(correct_path_codeowners_size)} a codeowners file located in .github/"
+  puts "  2. #{singular_or_plural(incorrect_path_codeowners_size)} a codeowners file located in the root directory"
+  puts "  3. #{singular_or_plural(duplicate_codeowners.length)} duplicate codeowners files"
+  puts "  4. #{singular_or_plural(missing_codeowners.length)} no codeowners file"
+end
+
+def print_results(status_arrays)
   correct_path_codeowners = status_arrays[0]
   correct_path_team_members_correct = correct_path_codeowners[0]
   correct_path_team_members_extra_and_missing = correct_path_codeowners[1]
@@ -538,80 +596,60 @@ def print_repo_statuses(status_arrays)
   duplicate_codeowners = status_arrays[2]
   missing_codeowners = status_arrays[3]
 
-  puts
-  # correct_path_codeowners_size = correct_path_codeowners[0].length + correct_path_codeowners[1].length
-  correct_path_codeowners_size = correct_path_codeowners.flatten(1).count
-  puts "#{singular_or_plural(correct_path_codeowners_size)} a codeowners file located in .github/".green
+  loop do
+    puts
+    print_initial_findings(status_arrays)
+    puts
+    detailed_results_prompt = 'If you\'d like to view detailed results, enter the number(s) of those you\'d like to see. Otherwise, hit enter'
+    response = request_input(detailed_results_prompt)
+    break if response == ''
 
-  print_correct_team_members_repo(correct_path_team_members_correct)
-  print_extra_and_missing_team_members_repo(correct_path_team_members_extra_and_missing)
-  print_missing_team_members_repo(correct_path_team_members_missing)
-  print_extra_team_members_repo(correct_path_team_members_extra)
+    response_array = response.gsub(' ','').split(',').map(&:to_i).uniq.sort
 
-  puts
-  puts
-  # incorrect_path_codeowners_size = incorrect_path_codeowners[0].length + incorrect_path_codeowners[1].length
-  incorrect_path_codeowners_size = incorrect_path_codeowners.flatten(1).count
-  puts "#{singular_or_plural(incorrect_path_codeowners_size)} a codeowners file located in the root directory".yellow
+    response_array.each do |response_index|
+      puts
 
-  print_correct_team_members_repo(incorrect_path_team_members_correct)
-  print_extra_and_missing_team_members_repo(incorrect_path_team_members_extra_and_missing)
-  print_missing_team_members_repo(incorrect_path_team_members_missing)
-  print_extra_team_members_repo(incorrect_path_team_members_extra)
+      case response_index
+      when 1
+        correct_path_codeowners_size = correct_path_codeowners.flatten(1).count
+        puts "1. #{singular_or_plural(correct_path_codeowners_size)} a codeowners file located in .github/"
 
-  puts
-  puts
-  puts "#{singular_or_plural(duplicate_codeowners.length)} duplicate codeowners files".yellow
-  print_list(duplicate_codeowners)
+        print_correct_team_members_repo(correct_path_team_members_correct)
+        print_extra_and_missing_team_members_repo(correct_path_team_members_extra_and_missing)
+        print_missing_team_members_repo(correct_path_team_members_missing)
+        print_extra_team_members_repo(correct_path_team_members_extra)
+      when 2
+        incorrect_path_codeowners_size = incorrect_path_codeowners.flatten(1).count
+        puts "2. #{singular_or_plural(incorrect_path_codeowners_size)} a codeowners file located in the root directory"
 
-  puts
-  puts
-  puts "#{singular_or_plural(missing_codeowners.length)} no codeowners file".red
-  print_list(missing_codeowners)
-  puts
+        print_correct_team_members_repo(incorrect_path_team_members_correct)
+        print_extra_and_missing_team_members_repo(incorrect_path_team_members_extra_and_missing)
+        print_missing_team_members_repo(incorrect_path_team_members_missing)
+        print_extra_team_members_repo(incorrect_path_team_members_extra)
+      when 3
+        puts "3. #{singular_or_plural(duplicate_codeowners.length)} duplicate codeowners files"
+        print_repo_name_table(duplicate_codeowners)
+      when 4
+        puts "4. #{singular_or_plural(missing_codeowners.length)} no codeowners file"
+        print_repo_name_table(missing_codeowners)
+      else
+        puts "#{response_index} is not a valid number. Valid numbers are between 1 and 4".red
+      end
+    end
+  end
+
+  team_response = ''
+  loop do
+    full_url = base_url + "/orgs/#{organization_name}/teams/#{team}"
+    team_response = execute_get(full_url, token)
+
+    break if team_response.code == '200'
+
+    puts
+    puts "#{$x} The team \"#{team}\" was not found in the \"#{organization_name}\" organization.".red
+    team = request_input(prompt)
+  end
 end
-
-# Sort and print repos
-def analyze_repos(base_url, token, team_members, repo_names)
-  # Initialize status arrays
-  correct_path_team_members_correct = []
-  correct_path_team_members_extra_and_missing = []
-  correct_path_team_members_missing = []
-  correct_path_team_members_extra = []
-  correct_path_codeowners = [
-    correct_path_team_members_correct,
-    correct_path_team_members_extra_and_missing,
-    correct_path_team_members_missing,
-    correct_path_team_members_extra
-  ]
-
-  incorrect_path_team_members_correct = []
-  incorrect_path_team_members_extra_and_missing = []
-  incorrect_path_team_members_missing = []
-  incorrect_path_team_members_extra = []
-  incorrect_path_codeowners = [
-    incorrect_path_team_members_correct,
-    incorrect_path_team_members_extra_and_missing,
-    incorrect_path_team_members_missing,
-    incorrect_path_team_members_extra
-  ]
-
-  duplicate_codeowners = []
-  missing_codeowners = []
-
-  status_arrays = [
-    correct_path_codeowners,
-    incorrect_path_codeowners,
-    duplicate_codeowners,
-    missing_codeowners
-  ]
-
-  # repo_name = 'healtheintent/analytics-audit'
-
-  sort_repos(base_url, token, team_members, repo_names, status_arrays)
-  print_repo_statuses(status_arrays)
-end
-
 
 # Initialize required values
 base_url = initialize_base_url(ARGV[0],
@@ -631,22 +669,28 @@ puts "  - Id: #{team_id}"
 # Find team members
 team_members = get_team_members(base_url, token, team_id)
 puts
-puts "#{team_members.length} team members found".green
+puts "#{$checkmark} #{team_members.length} team members found".green
 print_team_members(team_members)
 
 # Give option to remove repos
 remove_items(team_members, 'team member', method(:print_team_members), method(:print_team_member))
 
+puts
+puts "#{$checkmark} Will be analyzing repos with #{team_members.length} team members".green
+
 # Find team repos
 repo_names = get_team_repos(base_url, token, team_id)
 puts
-puts "#{repo_names.length} repos found".green
-print_repo_names(repo_names)
+puts "#{$checkmark} #{repo_names.length} repos found".green
+print_list(repo_names)
 
 # Give option to remove repos
-remove_items(repo_names, 'repo', method(:print_repo_names))
+remove_items(repo_names, 'repo', method(:print_list))
 
 puts
 puts "Analyzing #{repo_names.length} repos..."
 
-analyze_repos(base_url, token, team_members, repo_names)
+status_arrays = initialize_status_arrays
+sort_repos(base_url, token, team_members, repo_names, status_arrays)
+
+print_results(status_arrays)
