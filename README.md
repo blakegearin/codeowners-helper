@@ -55,11 +55,20 @@ Codeowners Helper is a command-line interface for CODEOWNERS maintenance for tea
 
 ## Usage
 
-### Analyze Repos
+### Analyze Codeowners
 
-**Description:** This will audit the existing repos belonging to one team to determine the location of CODEOWNERS files and whether there are any missing and/or extra users listed.
+#### Description
 
-#### Parameters
+This will audit the repos belonging to one team to determine the location of CODEOWNERS files and whether there are any missing team members or extra.
+
+#### Features
+
+* Option to remove team members & repos
+* Progress bar
+* Detailed results displayed in tables
+* Messages are color- & symbol-coded for easy reading
+
+#### Run
 
 This can be run without command-line arguments but you will be prompted to type required arguments during execution.
 
@@ -68,9 +77,9 @@ This can be run without command-line arguments but you will be prompted to type 
 ruby ./analyze_codeowners.rb
 ```
 
-##### Required
+##### Required Parameters
 
-These can be passed in via command-line arguments or typed in during execution. Order is enforced.
+These can be passed in via command-line arguments or typed in during execution.
 
 1. Hostname associated with the GitHub Enterprise
 2. OAuth token key
@@ -78,9 +87,6 @@ These can be passed in via command-line arguments or typed in during execution. 
 4. Name of the team
 
 ```command
-# Without CLI parameters
-ruby ./analyze_codeowners.rb
-
 # With CLI parameters
 ruby ./analyze_codeowners.rb [HOSTNAME]
 ruby ./analyze_codeowners.rb [HOSTNAME] [TOKEN_KEY]
@@ -88,7 +94,7 @@ ruby ./analyze_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME]
 ruby ./analyze_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME] [TEAM_NAME]
 ```
 
-##### Optional
+##### Optional Parameters
 
 These can be passed in via command-line arguments **after the required parameters**. Alternatively they can be typed in during exection. If passed in via command-line arguments, you won't be prompted to type in during execution.
 
@@ -101,15 +107,8 @@ These can be passed in via command-line arguments **after the required parameter
 2. Comma-separated list of repos to remove or `0` to skip
 
    ```command
-   ruby ./analyze_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME] [TEAM_NAME] 2,5,8 1,6,9
+   ruby ./analyze_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME] [TEAM_NAME] [TEAM_MEMBERS_TO_REMOVE] 1,6,9
    ```
-
-#### Features
-
-* Option to remove team members & repos
-* Progress bar
-* Detailed results displayed in tables
-* Messages are color- & symbol-coded for easy reading
 
 ## Notes
 
