@@ -4,6 +4,7 @@ require 'colorize'
 require 'json'
 require 'net/http'
 require 'pry'
+require 'ruby-progressbar'
 require 'terminal-table'
 require 'uri'
 
@@ -220,12 +221,12 @@ def get_team_repos(base_url, token, team_id)
   repos.sort
 end
 
-def check_correct_path(base_url, token, repo_name)
+def check_github_directory_path(base_url, token, repo_name)
   full_url = base_url + "/repos/#{repo_name}/contents/.github/CODEOWNERS"
   execute_get(full_url, token)
 end
 
-def check_incorrect_path(base_url, token, repo_name)
+def check_root_directory_path(base_url, token, repo_name)
   full_url = base_url + "/repos/#{repo_name}/contents/CODEOWNERS"
   execute_get(full_url, token)
 end
@@ -301,54 +302,61 @@ def print_list(array)
   end
 end
 
-def remove_items(array, name_of_items, print_all_function, print_one_function = nil)
+def remove_from_array(to_remove_string, array, name_of_items, print_one_function = nil)
+  to_remove_array = to_remove_string.gsub(' ','').split(',').map(&:to_i)
+  to_remove_array = to_remove_array.sort.reverse
+
+  # Find which to delete
+  removed = false
+  to_delete = []
+  to_remove_array.each do |to_remove_index|
+    valid_input_test = to_remove_index >= 1 && to_remove_index <= array.length
+    if valid_input_test
+      to_delete.push(to_remove_index-1)
+      removed = true
+    else
+      puts
+      puts "#{$x} #{to_remove_index} is not a valid number. Valid numbers are between 1 and #{array.length}".red
+    end
+  end
+
+  # Only consider unique input items
+  to_delete = to_delete.uniq
+
+  # Delete the items
+  to_delete.each do |index|
+    printed_item =
+        if print_one_function.nil?
+          array[index-1]
+        else
+          print_one_function.call(array[index])
+        end
+      remove_message = "#{$checkmark} Removing the #{name_of_items} at position #{index+1}: \"#{printed_item}\"".green
+      puts
+      puts remove_message
+    array.delete_at(index)
+  end
+
+  removed
+end
+
+def remove_items_prompt(array, name_of_items, print_all_function, print_one_function = nil)
   puts
   puts "Would you like to remove a #{name_of_items}? y/n"
 
   loop do
     print "Input: ".blue
-    remove_member = STDIN.gets.chomp
-    break if ['n', 'no', ''].include?(remove_member.downcase)
+    remove_items = STDIN.gets.chomp
+    break if ['n', 'no', ''].include?(remove_items.downcase)
 
-    if ['y', 'yes'].include?(remove_member.downcase)
+    if ['y', 'yes'].include?(remove_items.downcase)
       loop do
         puts
         puts "Enter the number of #{name_of_items} you would you like to remove or enter multiple separated by commas."
         print "Input: ".blue
-        to_remove = STDIN.gets.chomp
-        to_remove_array = to_remove.gsub(' ','').split(',').map(&:to_i)
-        to_remove_array = to_remove_array.sort.reverse
+        to_remove_string = STDIN.gets.chomp
 
-        # Find which to delete
-        removed = false
-        to_delete = []
-        to_remove_array.each do |to_remove_index|
-          valid_input_test = to_remove_index >= 1 && to_remove_index <= array.length
-          if valid_input_test
-            to_delete.push(to_remove_index-1)
-            removed = true
-          else
-            puts
-            puts "#{$x} #{to_remove_index} is not a valid number. Valid numbers are between 1 and #{array.length}".red
-          end
-        end
-
-        # Only consider unique input items
-        to_delete = to_delete.uniq
-
-        # Delete the items
-        to_delete.each do |index|
-          printed_item =
-              if print_one_function.nil?
-                array[index-1]
-              else
-                print_one_function.call(array[index])
-              end
-            remove_message = "#{$checkmark} Removing the #{name_of_items} at position #{index+1}: \"#{printed_item}\"".green
-            puts
-            puts remove_message
-          array.delete_at(index)
-        end
+        removed = remove_from_array(to_remove_string, array, name_of_items, print_one_function)
 
         break if removed
       end
@@ -369,37 +377,22 @@ def remove_items(array, name_of_items, print_all_function, print_one_function = 
 end
 
 def initialize_status_arrays
-  correct_path_team_members_correct = []
-  correct_path_team_members_extra_and_missing = []
-  correct_path_team_members_missing = []
-  correct_path_team_members_extra = []
-  correct_path_codeowners = [
-    correct_path_team_members_correct,
-    correct_path_team_members_extra_and_missing,
-    correct_path_team_members_missing,
-    correct_path_team_members_extra
-  ]
-
-  incorrect_path_team_members_correct = []
-  incorrect_path_team_members_extra_and_missing = []
-  incorrect_path_team_members_missing = []
-  incorrect_path_team_members_extra = []
-  incorrect_path_codeowners = [
-    incorrect_path_team_members_correct,
-    incorrect_path_team_members_extra_and_missing,
-    incorrect_path_team_members_missing,
-    incorrect_path_team_members_extra
-  ]
-
-  duplicate_codeowners = []
-  missing_codeowners = []
-
-  [
-    correct_path_codeowners,
-    incorrect_path_codeowners,
-    duplicate_codeowners,
-    missing_codeowners
-  ]
+  {
+    'github_directory_path' => {
+      'team_members_correct' => [],
+      'team_members_extra_and_missing' => [],
+      'team_members_missing' => [],
+      'team_members_extra' => []
+    },
+    'root_directory_path' => {
+      'team_members_correct' => [],
+      'team_members_extra_and_missing' => [],
+      'team_members_missing' => [],
+      'team_members_extra' => []
+    },
+    'duplicate_codeowners' => [],
+    'missing_codeowners' => []
+  }
 end
 
 def singular_or_plural(number)
@@ -411,102 +404,92 @@ def singular_or_plural(number)
 end
 
 # Sort repos into status arrays
-def sort_repos(base_url, token, team_members, repo_names, status_arrays)
-  correct_path_codeowners = status_arrays[0]
-  correct_path_team_members_correct = correct_path_codeowners[0]
-  correct_path_team_members_extra_and_missing = correct_path_codeowners[1]
-  correct_path_team_members_missing = correct_path_codeowners[2]
-  correct_path_team_members_extra = correct_path_codeowners[3]
-
-  incorrect_path_codeowners = status_arrays[1]
-  incorrect_path_team_members_correct = incorrect_path_codeowners[0]
-  incorrect_path_team_members_extra_and_missing = correct_path_codeowners[1]
-  incorrect_path_team_members_missing = incorrect_path_codeowners[2]
-  incorrect_path_team_members_extra = incorrect_path_codeowners[3]
-
-  duplicate_codeowners = status_arrays[2]
-  missing_codeowners = status_arrays[3]
+def sort_repos(progress_bar, base_url, token, team_members, repo_names, status_arrays)
+  github_directory_path_codeowners = status_arrays['github_directory_path']
+  root_directory_path_codeowners = status_arrays['root_directory_path']
+  duplicate_codeowners = status_arrays['duplicate_codeowners']
+  missing_codeowners = status_arrays['missing_codeowners']
 
   repo_names.each do |repo_name|
-    correct_path_response = ''
-    incorrect_path_response = ''
+    github_directory_path_response = ''
+    root_directory_path_response = ''
 
-    correct_path_response = check_correct_path(base_url, token, repo_name)
-    correct_path = correct_path_response.code == '200'
+    github_directory_path_response = check_github_directory_path(base_url, token, repo_name)
+    github_directory_path = github_directory_path_response.code == '200'
 
-    incorrect_path_response = check_incorrect_path(base_url, token, repo_name)
-    incorrect_path = incorrect_path_response.code == '200'
+    root_directory_path_response = check_root_directory_path(base_url, token, repo_name)
+    root_directory_path = root_directory_path_response.code == '200'
 
-    if correct_path && incorrect_path
+    if github_directory_path && root_directory_path
       duplicate_codeowners.push(repo_name)
-    elsif correct_path
-      codeowners_download_url = eval(string_to_json(correct_path_response.body).to_s)['download_url']
+    elsif github_directory_path
+      codeowners_download_url = eval(string_to_json(github_directory_path_response.body).to_s)['download_url']
       users_in_codeowners_file = get_codeowners(codeowners_download_url, token)
 
       missing_team_members = missing_team_members_test(team_members, users_in_codeowners_file)
       extra_team_members = extra_team_members_test(team_members, users_in_codeowners_file)
 
-      if missing_team_members.empty? && extra_team_members.empty?
-        correct_path_team_members_extra_and_missing.push(
-          [
-            repo_name,
-            missing_team_members,
-            extra_team_members
-          ]
+      if !missing_team_members.empty? && !extra_team_members.empty?
+        github_directory_path_codeowners['team_members_extra_and_missing'].push(
+          {
+            'repo_name' => repo_name,
+            'missing_team_members' => missing_team_members,
+            'extra_team_members' => extra_team_members
+          }
         )
-      elsif missing_team_members.empty?
-        correct_path_team_members_missing.push(
-          [
-            repo_name,
-            extra_team_members
-          ]
+      elsif !missing_team_members.empty?
+        github_directory_path_codeowners['team_members_missing'].push(
+          {
+            'repo_name' => repo_name,
+            'missing_team_members' => missing_team_members
+          }
         )
-      elsif extra_team_members.empty?
-        correct_path_team_members_extra.push(
-          [
-            repo_name,
-            missing_team_members
-          ]
+      elsif !extra_team_members.empty?
+        github_directory_path_codeowners['team_members_extra'].push(
+          {
+            'repo_name' => repo_name,
+            'extra_team_members' => extra_team_members
+          }
         )
       else
-        correct_path_team_members_correct.push(repo_name)
+        github_directory_path_codeowners['team_members_correct'].push(repo_name)
       end
-    elsif incorrect_path
-      codeowners_download_url = eval(string_to_json(incorrect_path_response.body).to_s)['download_url']
+    elsif root_directory_path
+      codeowners_download_url = eval(string_to_json(root_directory_path_response.body).to_s)['download_url']
       users_in_codeowners_file = get_codeowners(codeowners_download_url, token)
 
       missing_team_members = missing_team_members_test(team_members, users_in_codeowners_file)
       extra_team_members = extra_team_members_test(team_members, users_in_codeowners_file)
-      # binding.pry if repo_name == 'healtheintent/analytics-content-authoring'
 
-      if missing_team_members.empty? && extra_team_members.empty?
-        incorrect_path_team_members_extra_and_missing.push(
-          [
-            repo_name,
-            missing_team_members,
-            extra_team_members
-          ]
+      if !missing_team_members.empty? && !extra_team_members.empty?
+        root_directory_path_codeowners['team_members_extra_and_missing'].push(
+          {
+            'repo_name' => repo_name,
+            'missing_team_members' => missing_team_members,
+            'extra_team_members' => extra_team_members
+          }
         )
-      elsif missing_team_members.empty?
-        incorrect_path_team_members_missing.push(
-          [
-            repo_name,
-            extra_team_members
-          ]
+      elsif !missing_team_members.empty?
+        root_directory_path_codeowners['team_members_missing'].push(
+          {
+            'repo_name' => repo_name,
+            'missing_team_members' => missing_team_members
+          }
         )
-      elsif extra_team_members.empty?
-        incorrect_path_team_members_extra.push(
-          [
-            repo_name,
-            missing_team_members
-          ]
+      elsif !extra_team_members.empty?
+        root_directory_path_codeowners['team_members_extra'].push(
+          {
+            'repo_name' => repo_name,
+            'extra_team_members' => extra_team_members
+          }
         )
       else
-        incorrect_path_team_members_correct.push(repo_name)
+        root_directory_path_codeowners['team_members_correct'].push(repo_name)
       end
     else
       missing_codeowners.push(repo_name)
     end
+    progress_bar.increment
   end
 end
 
@@ -526,9 +509,9 @@ def print_extra_and_missing_team_members_repo(array)
   table = Terminal::Table.new :headings => ['Repo Name', 'Missing Team Members', 'Extra Team Members']
   array.each do |item|
     table.add_row [
-      item[0],
-      item[1].join(', '),
-      item[2].join(', ')
+      item['repo_name'],
+      item['missing_team_members'].join(', '),
+      item['extra_team_members'].join(', ')
     ]
   end
   puts table
@@ -541,8 +524,8 @@ def print_missing_team_members_repo(array)
   table = Terminal::Table.new :headings => ['Repo Name', 'Missing Team Members']
   array.each do |item|
     table.add_row [
-      item[0],
-      item[1].join(', ')
+      item['repo_name'],
+      item['missing_team_members'].join(', ')
     ]
   end
   puts table
@@ -555,46 +538,48 @@ def print_extra_team_members_repo(array)
   table = Terminal::Table.new :headings => ['Repo Name', 'Extra Team Members']
   array.each do |item|
     table.add_row [
-      item[0],
-      item[1].join(', ')
+      item['repo_name'],
+      item['extra_team_members'].join(', ')
     ]
   end
   puts table
 end
 
 def print_initial_findings(status_arrays)
-  correct_path_codeowners = status_arrays[0]
-  incorrect_path_codeowners = status_arrays[1]
-  duplicate_codeowners = status_arrays[2]
-  missing_codeowners = status_arrays[3]
+  github_directory_path_codeowners = status_arrays['github_directory_path']
+  root_directory_path_codeowners = status_arrays['root_directory_path']
+  duplicate_codeowners = status_arrays['duplicate_codeowners']
+  missing_codeowners = status_arrays['missing_codeowners']
 
-  status_arrays_size = status_arrays.flatten(1).count
+  github_directory_path_codeowners_size = github_directory_path_codeowners['team_members_correct'].length +
+      github_directory_path_codeowners['team_members_extra_and_missing'].length +
+      github_directory_path_codeowners['team_members_missing'].length +
+      github_directory_path_codeowners['team_members_extra'].length
 
-  correct_path_codeowners_size = correct_path_codeowners.flatten(1).count
-  incorrect_path_codeowners_size = incorrect_path_codeowners.flatten(1).count
+  root_directory_path_codeowners_size = root_directory_path_codeowners['team_members_correct'].length +
+      root_directory_path_codeowners['team_members_extra_and_missing'].length +
+      root_directory_path_codeowners['team_members_missing'].length +
+      root_directory_path_codeowners['team_members_extra'].length
 
-  puts "#{$checkmark} #{status_arrays_size} repos analyzed".green
-  puts "  1. #{singular_or_plural(correct_path_codeowners_size)} a codeowners file located in .github/"
-  puts "  2. #{singular_or_plural(incorrect_path_codeowners_size)} a codeowners file located in the root directory"
+  repos_analyzed = github_directory_path_codeowners_size +
+      root_directory_path_codeowners_size +
+      duplicate_codeowners.length +
+      missing_codeowners.length
+
+  # binding.pry
+
+  puts "#{$checkmark} #{repos_analyzed} repos analyzed".green
+  puts "  1. #{singular_or_plural(github_directory_path_codeowners_size)} a codeowners file located in .github/"
+  puts "  2. #{singular_or_plural(root_directory_path_codeowners_size)} a codeowners file located in the root directory"
   puts "  3. #{singular_or_plural(duplicate_codeowners.length)} duplicate codeowners files"
   puts "  4. #{singular_or_plural(missing_codeowners.length)} no codeowners file"
 end
 
 def print_results(status_arrays)
-  correct_path_codeowners = status_arrays[0]
-  correct_path_team_members_correct = correct_path_codeowners[0]
-  correct_path_team_members_extra_and_missing = correct_path_codeowners[1]
-  correct_path_team_members_missing = correct_path_codeowners[2]
-  correct_path_team_members_extra = correct_path_codeowners[3]
-
-  incorrect_path_codeowners = status_arrays[1]
-  incorrect_path_team_members_correct = incorrect_path_codeowners[0]
-  incorrect_path_team_members_extra_and_missing = correct_path_codeowners[1]
-  incorrect_path_team_members_missing = incorrect_path_codeowners[2]
-  incorrect_path_team_members_extra = incorrect_path_codeowners[3]
-
-  duplicate_codeowners = status_arrays[2]
-  missing_codeowners = status_arrays[3]
+  github_directory_path_codeowners = status_arrays['github_directory_path']
+  root_directory_path_codeowners = status_arrays['root_directory_path']
+  duplicate_codeowners = status_arrays['duplicate_codeowners']
+  missing_codeowners = status_arrays['missing_codeowners']
 
   loop do
     puts
@@ -611,43 +596,33 @@ def print_results(status_arrays)
 
       case response_index
       when 1
-        correct_path_codeowners_size = correct_path_codeowners.flatten(1).count
-        puts "1. #{singular_or_plural(correct_path_codeowners_size)} a codeowners file located in .github/"
+        github_directory_path_codeowners_size = github_directory_path_codeowners.flatten(1).count
+        puts "1. #{singular_or_plural(github_directory_path_codeowners_size)} a codeowners file located in .github/"
 
-        print_correct_team_members_repo(correct_path_team_members_correct)
-        print_extra_and_missing_team_members_repo(correct_path_team_members_extra_and_missing)
-        print_missing_team_members_repo(correct_path_team_members_missing)
-        print_extra_team_members_repo(correct_path_team_members_extra)
+        print_correct_team_members_repo(github_directory_path_codeowners['team_members_correct'])
+        print_extra_and_missing_team_members_repo(github_directory_path_codeowners['team_members_extra_and_missing'])
+        print_missing_team_members_repo(github_directory_path_codeowners['team_members_missing'])
+        print_extra_team_members_repo(github_directory_path_codeowners['team_members_extra'])
       when 2
-        incorrect_path_codeowners_size = incorrect_path_codeowners.flatten(1).count
-        puts "2. #{singular_or_plural(incorrect_path_codeowners_size)} a codeowners file located in the root directory"
+        root_directory_path_codeowners_size = root_directory_path_codeowners.flatten(1).count
+        puts "2. #{singular_or_plural(root_directory_path_codeowners_size)} a codeowners file located in the root directory"
 
-        print_correct_team_members_repo(incorrect_path_team_members_correct)
-        print_extra_and_missing_team_members_repo(incorrect_path_team_members_extra_and_missing)
-        print_missing_team_members_repo(incorrect_path_team_members_missing)
-        print_extra_team_members_repo(incorrect_path_team_members_extra)
+        print_correct_team_members_repo(root_directory_path_codeowners['team_members_correct'])
+        print_extra_and_missing_team_members_repo(root_directory_path_codeowners['team_members_extra_and_missing'])
+        print_missing_team_members_repo(root_directory_path_codeowners['team_members_missing'])
+        print_extra_team_members_repo(root_directory_path_codeowners['team_members_extra'])
       when 3
         puts "3. #{singular_or_plural(duplicate_codeowners.length)} duplicate codeowners files"
         print_repo_name_table(duplicate_codeowners)
       when 4
         puts "4. #{singular_or_plural(missing_codeowners.length)} no codeowners file"
         print_repo_name_table(missing_codeowners)
+      when nil
+        break
       else
         puts "#{response_index} is not a valid number. Valid numbers are between 1 and 4".red
       end
     end
-  end
-
-  team_response = ''
-  loop do
-    full_url = base_url + "/orgs/#{organization_name}/teams/#{team}"
-    team_response = execute_get(full_url, token)
-
-    break if team_response.code == '200'
-
-    puts
-    puts "#{$x} The team \"#{team}\" was not found in the \"#{organization_name}\" organization.".red
-    team = request_input(prompt)
   end
 end
 
@@ -668,12 +643,20 @@ puts "  - Id: #{team_id}"
 
 # Find team members
 team_members = get_team_members(base_url, token, team_id)
+
 puts
 puts "#{$checkmark} #{team_members.length} team members found".green
 print_team_members(team_members)
 
-# Give option to remove repos
-remove_items(team_members, 'team member', method(:print_team_members), method(:print_team_member))
+case ARGV[4]
+when nil
+  remove_items_prompt(team_members, 'team member', method(:print_team_members), method(:print_team_member))
+when '0'
+  puts
+  puts "#{$checkmark} Skipping removal of team members".yellow
+else
+  remove_from_array(ARGV[4], team_members, 'team member', method(:print_team_member))
+end
 
 puts
 puts "#{$checkmark} Will be analyzing repos with #{team_members.length} team members".green
@@ -684,13 +667,29 @@ puts
 puts "#{$checkmark} #{repo_names.length} repos found".green
 print_list(repo_names)
 
-# Give option to remove repos
-remove_items(repo_names, 'repo', method(:print_list))
+case ARGV[5]
+when nil
+  remove_items_prompt(repo_names, 'repo', method(:print_list))
+when '0'
+  puts
+  puts "#{$checkmark} Skipping removal of repos".yellow
+else
+  remove_from_array(ARGV[5], repo_names, 'repo')
+end
 
 puts
 puts "Analyzing #{repo_names.length} repos..."
+progress_bar = ProgressBar.create(:total => repo_names.length, :format => '|%B|')
 
 status_arrays = initialize_status_arrays
-sort_repos(base_url, token, team_members, repo_names, status_arrays)
+sort_repos(progress_bar, base_url, token, team_members, repo_names, status_arrays)
+
+file_name = 'analyze_codeowners_results.json'
+file = File.new(file_name, 'w')
+file.write(JSON.pretty_generate(status_arrays))
+file.close
+
+puts
+puts "#{$checkmark} Results saved to #{file_name}".green
 
 print_results(status_arrays)

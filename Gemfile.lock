@@ -17,6 +17,7 @@ GEM
     pry (0.12.2)
       coderay (~> 1.1.0)
       method_source (~> 0.9.0)
+    ruby-progressbar (1.10.0)
     terminal-table (1.8.0)
       unicode-display_width (~> 1.1, >= 1.1.1)
     thread_safe (0.3.6)
@@ -31,6 +32,7 @@ DEPENDENCIES
   activesupport (~> 5.2)
   nokogiri (~> 1.10)
   pry
+  ruby-progressbar
   terminal-table
 
 BUNDLED WITH
