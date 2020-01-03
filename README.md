@@ -2,6 +2,13 @@
 
 Codeowners Helper is a command-line interface for CODEOWNERS maintenance for teams with lots of repos on GitHub Enterprise.
 
+## Features
+
+* Multiple ways to input required parameters or skip optional ones
+* Progress bar to keep you informed
+* Detailed results are displayed in tables
+* Messages are color- & symbol-coded for easy reading
+
 ## Prerequisites
 
 * [Ruby](https://www.ruby-lang.org/en/documentation/installation/) — 2.6 recommended
@@ -55,60 +62,74 @@ Codeowners Helper is a command-line interface for CODEOWNERS maintenance for tea
 
 ## Usage
 
-### Analyze Codeowners
+### Required Parameters
 
-#### Description
-
-This will audit the repos belonging to one team to determine the location of CODEOWNERS files and whether there are any missing team members or extra.
-
-#### Features
-
-* Option to remove team members & repos
-* Progress bar
-* Detailed results displayed in tables
-* Messages are color- & symbol-coded for easy reading
-
-#### Run
-
-This can be run without command-line arguments but you will be prompted to type required arguments during execution.
-
-```command
-# Without CLI parameters
-ruby ./analyze_codeowners.rb
-```
-
-##### Required Parameters
-
-These can be passed in via command-line arguments or typed in during execution.
+These can be passed in via command-line or typed in during execution.
 
 1. Hostname associated with the GitHub Enterprise
 2. OAuth token key
 3. Name of the organization of which the team belongs
 4. Name of the team
 
+### Analyze Codeowners
+
+#### Description
+
+This will audit the repos belonging to one team to determine the location of CODEOWNERS files and whether there are any missing team members or extra.
+
+#### Run
+
+This can be run without command-line arguments but you will be prompted to type required parameters during execution.
+
+Optional parameters can be passed in via command-line **after the required parameters**. Alternatively they can be typed in or skipped during execution. If passed in via command-line, you won't be prompted to type in during execution.
+
+1. Comma-separated list of team members to remove or `0` to skip
+2. Comma-separated list of repos to remove or `0` to skip
+
 ```command
-# With CLI parameters
+# Without command-line arguments
+ruby ./analyze_codeowners.rb
+
+# Required parameters as command-line arguments
 ruby ./analyze_codeowners.rb [HOSTNAME]
 ruby ./analyze_codeowners.rb [HOSTNAME] [TOKEN_KEY]
 ruby ./analyze_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME]
 ruby ./analyze_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME] [TEAM_NAME]
+
+# Required & optional parameters as command-line arguments
+ruby ./analyze_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME] [TEAM_NAME] 2,5,8
+ruby ./analyze_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME] [TEAM_NAME] [TEAM_MEMBERS_TO_REMOVE] 1,6,9
 ```
 
-##### Optional Parameters
+### Fix Codeowners
 
-These can be passed in via command-line arguments **after the required parameters**. Alternatively they can be typed in during exection. If passed in via command-line arguments, you won't be prompted to type in during execution.
+#### Description
+
+This will audit the repos belonging to one team to determine the location of CODEOWNERS files and whether there are any missing team members or extra.
+
+#### Run
+
+This can be run without command-line arguments but you will be prompted to type required parameters during execution.
+
+Optional parameters can be passed in via command-line arguments **after the required parameters**. Alternatively they can be typed in during execution. If passed in via command-line, you won't be prompted to type in during execution.
 
 1. Comma-separated list of team members to remove or `0` to skip
-
-   ```command
-   ruby ./analyze_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME] [TEAM_NAME] 2,5,8
-   ```
-
 2. Comma-separated list of repos to remove or `0` to skip
 
-   ```command
-   ruby ./analyze_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME] [TEAM_NAME] [TEAM_MEMBERS_TO_REMOVE] 1,6,9
-   ```
+```command
+# Without command-line arguments
+ruby ./fix_codeowners.rb
+
+# Required parameters as command-line arguments
+ruby ./fix_codeowners.rb [HOSTNAME]
+ruby ./fix_codeowners.rb [HOSTNAME] [TOKEN_KEY]
+ruby ./fix_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME]
+ruby ./fix_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME] [TEAM_NAME]
+
+# Required & optional parameters as command-line arguments
+ruby ./fix_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME] [TEAM_NAME] 2,5,8
+ruby ./fix_codeowners.rb [HOSTNAME] [TOKEN_KEY] [ORGANIZATION_NAME] [TEAM_NAME] [TEAM_MEMBERS_TO_REMOVE] 1,6,9
+```
 
 ## Notes
 
