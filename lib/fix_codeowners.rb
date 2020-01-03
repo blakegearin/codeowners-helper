@@ -48,9 +48,16 @@ if ARGV[5].nil?
   input_file_hash = JSON.parse(input_file)
 else
   repo_name = ARGV[5]
-  master_branch_sha = get_branch_sha(base_url, token, repo_name, 'master')
-  puts master_branch_sha
+  branch_name = 'master'
+  puts "Default branch name is #{branch_name}"
+  change_branch = request_input("Press enter to continue or type something to change it")
+  branch_name = change_branch unless change_branch.nil?
+
+  main_branch_sha = get_branch_sha(base_url, token, repo_name, branch_name)
+  puts
+  puts "#{$check_mark} Master branch found starting with commit \"#{main_branch_sha}\""
 
   new_branch_ref = create_branch(base_url, token, repo_name, ARGV[6], master_branch_sha)
+  # new_branch_ref = create_branch(base_url, token, repo_name, 'fix_codeowners', master_branch_sha)
   puts new_branch_ref
 end

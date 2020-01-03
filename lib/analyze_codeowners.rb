@@ -125,7 +125,7 @@ def remove_from_array(to_remove_string, array, name_of_items, print_one_function
         else
           print_one_function.call(array[index])
         end
-      remove_message = "#{$checkmark} Removing the #{name_of_items} at position #{index+1}: \"#{printed_item}\"".green
+      remove_message = "#{$check_mark} Removing the #{name_of_items} at position #{index+1}: \"#{printed_item}\"".green
       puts
       puts remove_message
     array.delete_at(index)
@@ -252,7 +252,7 @@ def sort_repos(progress_bar, base_url, token, team_members, repo_names, status_a
 end
 
 def print_correct_team_members_repo(array)
-  puts "#{$checkmark} #{singular_or_plural(array.length)} no missing or extra team members".green
+  puts "#{$check_mark} #{singular_or_plural(array.length)} no missing or extra team members".green
   return if array.length == 0
 
   table = Terminal::Table.new :headings => ['Repo Name'],
@@ -324,7 +324,7 @@ def print_initial_findings(status_arrays)
       duplicate_codeowners.length +
       missing_codeowners.length
 
-  puts "#{$checkmark} #{repos_analyzed} repos analyzed".green
+  puts "#{$check_mark} #{repos_analyzed} repos analyzed".green
   puts "  1. #{singular_or_plural(github_directory_path_codeowners_size)} a codeowners file located in .github/"
   puts "  2. #{singular_or_plural(root_directory_path_codeowners_size)} a codeowners file located in the root directory"
   puts "  3. #{singular_or_plural(duplicate_codeowners.length)} duplicate codeowners files"
@@ -385,12 +385,12 @@ end
 base_url, token, team_id, team_members = initialization
 
 puts
-puts "#{$checkmark} Will be analyzing repos with #{team_members.length} team members".green
+puts "#{$check_mark} Will be analyzing repos with #{team_members.length} team members".green
 
 # Find team repos
 repo_names = get_team_repos(base_url, token, team_id)
 puts
-puts "#{$checkmark} #{repo_names.length} repos found".green
+puts "#{$check_mark} #{repo_names.length} repos found".green
 print_list(repo_names)
 
 case ARGV[5]
@@ -398,7 +398,7 @@ when nil
   remove_items_prompt(repo_names, 'repo', method(:print_list))
 when '0'
   puts
-  puts "#{$checkmark} Skipping removal of repos".yellow
+  puts "#{$check_mark} Skipping removal of repos".yellow
 else
   remove_from_array(ARGV[5], repo_names, 'repo')
 end
@@ -416,6 +416,6 @@ file.write(JSON.pretty_generate(status_arrays))
 file.close
 
 puts
-puts "#{$checkmark} Results saved to #{file_name}".green
+puts "#{$check_mark} Results saved to #{file_name}".green
 
 print_results(status_arrays)
