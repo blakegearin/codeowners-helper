@@ -2,7 +2,7 @@
 
 source 'https://rubygems.org'
 
-gem 'activesupport', '~> 5.2'
+gem 'activesupport', '~> 6.1'
 gem 'nokogiri', '~> 1.13'
 gem 'pry'
 gem 'ruby-progressbar'
